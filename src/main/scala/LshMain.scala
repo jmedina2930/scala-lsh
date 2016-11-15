@@ -65,18 +65,19 @@ object LshMain {
     val rawLine = line.replace("((", "").replace(")", "")
     val fields = rawLine.split(",")
     val nline = fields(0).toLong
-    ((((nline -1) / linesPerBand) + 1).toString(), rawLine)
+    ((((nline-1) / linesPerBand) + 1).toString() + "," + fields(1), fields(2))
   }
 
   /**
     * Obtiene el bucket y con eso mapea a banda,bucket
     */
-  def getBandAndBucket(key: String, value: Iterable[String]): Array[(String, String)] = {
-    val array = new Array[(String, String)](5)
-
-//    value.reduce((a, b) => a + b)
-
-    array
+  def getBandAndBucket(a: String, b: String): String = {
+    println("jaja" + a)
+    val line1 = a.split(",")
+    val signature1 = line1(1)
+    val line2 = b.split(",")
+    val signature2 = line2(1)
+    signature1 + signature2
   }
 
   def main(args: Array[String]): Unit = {
@@ -112,12 +113,14 @@ object LshMain {
     /* Mapea banda Y documento
      * "(1,1,0)", "(1,2,0)" map to: ("1,1", "1,1,0"),("1,2", "1,2,0")
      */
-    val bandAndDocument = file.map(line => getBandAndDocument(line, rowsPerBand)).groupByKey()
+    val bandAndDocument = file.map(line => getBandAndDocument(line, rowsPerBand))
     if (isDebug) bandAndDocument.foreach(line => println("map: " + line))
 
 
-//    val bandAndBucket = bandAndDocument.reduceByKey((a,b) => a+b)
-    val bandAndBucket = bandAndDocument.flatMap { case (k, v) => getBandAndBucket(k, v) }
+    val concatenate = bandAndDocument.reduceByKey((a,b) => a+b)
+    val bandAndBucket = concatenate.map(x => ((x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % 23), x._1.split(",")(1)))
+
+//    val bandAndBucket = bandAndDocument.flatMap { case (k, v) => getBandAndBucket(k, v) }
     if (isDebug) bandAndBucket.foreach(println)
 
 
