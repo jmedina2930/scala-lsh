@@ -111,17 +111,25 @@ object LshMain {
     if (isDebug) file.collect().foreach(line => println("linea: " + line))
 
     /* Mapea banda Y documento
-     * "(1,1,0)", "(1,2,0)" map to: ("1,1", "1,1,0"),("1,2", "1,2,0")
+     * "(1,1,0)", "(1,2,0)" map to: ("1,1", "0"),("1,2", "0")
      */
     val bandAndDocument = file.map(line => getBandAndDocument(line, rowsPerBand))
     if (isDebug) bandAndDocument.foreach(line => println("map: " + line))
 
-
+    //Concatena todas las firmas que pertenezcan a una misma banda y documento
     val concatenate = bandAndDocument.reduceByKey((a,b) => a+b)
-    val bandAndBucket = concatenate.map(x => ((x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % 23), x._1.split(",")(1)))
 
-//    val bandAndBucket = bandAndDocument.flatMap { case (k, v) => getBandAndBucket(k, v) }
-    if (isDebug) bandAndBucket.foreach(println)
+    //Se hace el mapeo a ((banda, bucket), documento)
+    val map1 = concatenate.map(x => ((x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % 23), x._1.split(",")(1)))
+    if (isDebug) map1.foreach(println)
+
+    //Se concatenan los documentos que pertenezcan a la misma banda y misma cubeta
+    val reduce1 = map1.reduceByKey((a,b) => a + "," +b)
+
+    //Se dejan solo los resultados que contengan por lo menos un par de documentos
+    val reduceFilter = reduce1.filter(line => line._2.split(",").size > 1)
+    if (isDebug) reduceFilter.foreach(line => println("Reduce1: " + line))
+
 
 
     printlnWithTime("Fin")
