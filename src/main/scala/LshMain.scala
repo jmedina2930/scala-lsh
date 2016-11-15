@@ -62,7 +62,7 @@ object LshMain {
     * Mapea "id-shingle,id-doc,signature" to "band, id-doc", "id-shingle,id-doc,signature" Entera de Numero de linea/(Lineas por Banda)
     */
   def getBandAndDocument(line: String, linesPerBand: Long): (String, String) = {
-    val rawLine = line.replace("((", "").replace(")", "")
+    val rawLine = line.replace("((", "").replace(")", "").replace(" ", "")
     val fields = rawLine.split(",")
     val nline = fields(0).toLong
     ((((nline-1) / linesPerBand) + 1).toString() + "," + fields(1), fields(2))
@@ -110,18 +110,18 @@ object LshMain {
     val file = sc.textFile(signaturesFilePath)
     if (isDebug) file.collect().foreach(line => println("linea: " + line))
 
-    /* Mapea banda Y documento
-     * "(1,1,0)", "(1,2,0)" map to: ("1,1", "0"),("1,2", "0")
-     */
+    //Primera fase Map-Reduce----------------------------------------------------
+
+    // Mapea banda Y documento "(1,1,0)", "(1,2,0)" map to: ("1,1", "0"),("1,2", "0")
     val bandAndDocument = file.map(line => getBandAndDocument(line, rowsPerBand))
-    if (isDebug) bandAndDocument.foreach(line => println("map: " + line))
+    if (isDebug) bandAndDocument.foreach(line => println(line))
 
     //Concatena todas las firmas que pertenezcan a una misma banda y documento
     val concatenate = bandAndDocument.reduceByKey((a,b) => a+b)
 
     //Se hace el mapeo a ((banda, bucket), documento)
     val map1 = concatenate.map(x => ((x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % 23), x._1.split(",")(1)))
-    if (isDebug) map1.foreach(println)
+    if (isDebug) map1.foreach(line => println("map1: " + line))
 
     //Se concatenan los documentos que pertenezcan a la misma banda y misma cubeta
     val reduce1 = map1.reduceByKey((a,b) => a + "," +b)
@@ -129,6 +129,18 @@ object LshMain {
     //Se dejan solo los resultados que contengan por lo menos un par de documentos
     val reduceFilter = reduce1.filter(line => line._2.split(",").size > 1)
     if (isDebug) reduceFilter.foreach(line => println("Reduce1: " + line))
+
+
+    //Segunda fase Map-Reduce------------------------------------------------
+
+    //Mapeo a: ((doc1, doc2, ...), 1)
+    val map2 = reduceFilter.map(x => (x._2,1))
+    if (isDebug()) map2.foreach(line => println("Map2: " + line))
+
+    //Reduce para sumar los pares candidatos repetidos
+    val reduce2 = map2.reduceByKey((a,b) => a+b)
+    if (isDebug()) reduce2.foreach(line => println("Reduce2: " + line))
+
 
 
 
