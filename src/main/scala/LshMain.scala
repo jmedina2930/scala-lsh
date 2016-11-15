@@ -79,6 +79,33 @@ object LshMain {
     val signature2 = line2(1)
     signature1 + signature2
   }
+  
+  /**
+   * encuentra el númuero primo mayor que n más cercano
+   * 
+   */
+  def getPrimeValue(base: Long): Long = {
+    
+    var primoMayor = base
+    var flag = true
+          
+    while(flag){
+      var divisor=1;
+      var j=0;
+      
+      while(divisor<=primoMayor){
+         if(primoMayor%divisor==0){
+           j = j + 1;
+         }
+         divisor = divisor + 1;
+      }
+      if(j<=2){
+        
+        flag = false
+      }else {primoMayor = primoMayor + 1}
+    }
+    primoMayor
+  }  
 
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf().setAppName("Scala-LSH").setMaster("local")
@@ -90,12 +117,14 @@ object LshMain {
     //    Parametros de entrada (produccion cluster)
     //      val signaturesFilePath : String = args(0)
     //      val directoryOutput : String = args(1)
-    //      val rowsPerBand : Int = args(2).toInt
+    //      val nband : Int = args(2).toInt
+    //      val rowsPerBand : Int = args(3).toInt
 
     //      Parametros quemados (Pruebas locales)
     val hdfsFiles = false
     val signaturesFilePath = "data/signaturesMat"
     val directoryOutput = "data/out"
+    val nband = 20
     val rowsPerBand = 5
 
     /* *********************************************************************************************/
@@ -114,21 +143,23 @@ object LshMain {
 
     // Mapea banda Y documento "(1,1,0)", "(1,2,0)" map to: ("1,1", "0"),("1,2", "0")
     val bandAndDocument = file.map(line => getBandAndDocument(line, rowsPerBand))
-    if (isDebug) bandAndDocument.foreach(line => println(line))
+    if (isDebug) bandAndDocument.foreach(line => println("bandAndDocument"+line))
 
     //Concatena todas las firmas que pertenezcan a una misma banda y documento
     val concatenate = bandAndDocument.reduceByKey((a,b) => a+b)
+    if (isDebug) concatenate.foreach(line => println("concatenate"+line))
 
     //Se hace el mapeo a ((banda, bucket), documento)
-    val map1 = concatenate.map(x => ((x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % 23), x._1.split(",")(1)))
-    if (isDebug) map1.foreach(line => println("map1: " + line))
+    val mapBucket = concatenate.map(x => ((x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % getPrimeValue(nband)), x._1.split(",")(1)))
+    if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
 
     //Se concatenan los documentos que pertenezcan a la misma banda y misma cubeta
-    val reduce1 = map1.reduceByKey((a,b) => a + "," +b)
+    val reduceBucket = mapBucket.reduceByKey((a,b) => a + "," +b)
+    if (isDebug) reduceBucket.foreach(line => println("reduceBucket: " + line))
 
     //Se dejan solo los resultados que contengan por lo menos un par de documentos
-    val reduceFilter = reduce1.filter(line => line._2.split(",").size > 1)
-    if (isDebug) reduceFilter.foreach(line => println("Reduce1: " + line))
+    val reduceFilter = reduceBucket.filter(line => line._2.split(",").size > 1)
+    if (isDebug) reduceFilter.foreach(line => println("reduceFilter: " + line))
 
 
     //Segunda fase Map-Reduce------------------------------------------------
@@ -140,9 +171,6 @@ object LshMain {
     //Reduce para sumar los pares candidatos repetidos
     val reduce2 = map2.reduceByKey((a,b) => a+b)
     if (isDebug()) reduce2.foreach(line => println("Reduce2: " + line))
-
-
-
 
     printlnWithTime("Fin")
 
