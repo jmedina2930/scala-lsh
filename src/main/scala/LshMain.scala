@@ -12,7 +12,7 @@ object LshMain {
     * En este modo se deja codigo adicional que puede afectar el rendimiento. Ejemplo: guardar archivos
     */
   def isDebug(): Boolean = {
-    true
+    false
   }
 
   /**
@@ -121,15 +121,24 @@ object LshMain {
     //      val rowsPerBand : Int = args(3).toInt
 
     //      Parametros quemados (Pruebas locales)
-    val hdfsFiles = false
-    val signaturesFilePath = "data/signaturesMat"
-    val directoryOutput = "data/out"
-    val nband = 20
-    val rowsPerBand = 5
+    
+//    val hdfsFiles = false
+//    val signaturesFilePath = "data/signaturesMat"
+//    val directoryOutput = "data/out"
+//    val nband = 20
+//    val rowsPerBand = 5
+    
+    val hdfsFiles = true
+    val signaturesFilePath = "/user/root/grupo2/results/test1/step2"
+    val directoryOutput = "/user/grupo1/lsh/out1"
+    //Numero de shingles 8007165
+    
+    val nband = 2669055
+    val rowsPerBand = 3    
 
     /* *********************************************************************************************/
 
-    deleteDirectoryOutput(directoryOutput, hdfsFiles)
+    //deleteDirectoryOutput(directoryOutput, hdfsFiles)
     //     createDataFile(sc, directoryOutput)
 
 
@@ -171,6 +180,8 @@ object LshMain {
     //Reduce para sumar los pares candidatos repetidos
     val reduce2 = map2.reduceByKey((a,b) => a+b)
     if (isDebug()) reduce2.foreach(line => println("Reduce2: " + line))
+    
+    reduce2.saveAsTextFile(directoryOutput)
 
     printlnWithTime("Fin")
 
