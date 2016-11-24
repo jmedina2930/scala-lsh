@@ -12,7 +12,7 @@ object LshMain {
     * En este modo se deja codigo adicional que puede afectar el rendimiento. Ejemplo: guardar archivos
     */
   def isDebug(): Boolean = {
-    false
+    true
   }
 
   /**
@@ -71,7 +71,7 @@ object LshMain {
   /**
     * Obtiene el bucket y con eso mapea a banda,bucket
     */
-  def getBandAndBucket(a: String, b: String): String = {
+  def hashFunction(a: String, b: String): String = {
     println("jaja" + a)
     val line1 = a.split(",")
     val signature1 = line1(1)
@@ -114,35 +114,38 @@ object LshMain {
     /* *********************************************************************************************/
     //CONFIGIRACION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    //    Parametros de entrada (produccion cluster)
-    //      val signaturesFilePath : String = args(0)
-    //      val directoryOutput : String = args(1)
-    //      val nband : Int = args(2).toInt
-    //      val rowsPerBand : Int = args(3).toInt
+//        Parametros de entrada (produccion cluster)
+//          val signaturesFilePath : String = args(0)
+//          val directoryOutput : String = args(1)
+//          val nband : Int = args(2).toInt
+//          val rowsPerBand : Int = args(3).toInt
 
     //      Parametros quemados (Pruebas locales)
     
-//    val hdfsFiles = false
-//    val signaturesFilePath = "data/signaturesMat"
-//    val directoryOutput = "data/out"
-//    val nband = 20
-//    val rowsPerBand = 5
+    val hdfsFiles = false
+//
+    val signaturesFilePath = "data/test1/step2"
+    val directoryOutput = "data/out"
+    val nband = 20
+    val rowsPerBand = 5
     
-    val hdfsFiles = true
-    val signaturesFilePath = "/user/root/grupo2/results/test1/step2"
-    val directoryOutput = "/user/grupo1/lsh/out1"
-    //Numero de shingles 8007165
-    
-    val nband = 2669055
-    val rowsPerBand = 3    
+//    val hdfsFiles = true
+//    val signaturesFilePath = "/user/root/grupo2/results/test1/step2"
+//    val directoryOutput = "/user/grupo1/lsh/out1"
+//    //Numero de shingles 8007165
+//
+//    val nband = 2669055
+//    val rowsPerBand = 3
 
     /* *********************************************************************************************/
 
-    //deleteDirectoryOutput(directoryOutput, hdfsFiles)
+    deleteDirectoryOutput(directoryOutput, hdfsFiles)
+
     //     createDataFile(sc, directoryOutput)
 
 
     printlnWithTime("Inicia")
+
 
     //lee archivo con tres valores: Id shingle(Long), Id documento (Long), Signature
     val file = sc.textFile(signaturesFilePath)
@@ -154,20 +157,23 @@ object LshMain {
     val bandAndDocument = file.map(line => getBandAndDocument(line, rowsPerBand))
     if (isDebug) bandAndDocument.foreach(line => println("bandAndDocument"+line))
 
-    //Concatena todas las firmas que pertenezcan a una misma banda y documento
-    val concatenate = bandAndDocument.reduceByKey((a,b) => a+b)
-    if (isDebug) concatenate.foreach(line => println("concatenate"+line))
+    //se aplica una funcion hash
+    val mapBucket = Hashing.classHashFunction(bandAndDocument, isDebug(),nband)
 
-    //Se hace el mapeo a ((banda, bucket), documento)
-    val mapBucket = concatenate.map(x => ((x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % getPrimeValue(nband)), x._1.split(",")(1)))
-    if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
+    //Concatena todas las firmas que pertenezcan a una misma banda y documento
+//    val concatenate = bandAndDocument.reduceByKey((a,b) => a+b)
+//    if (isDebug) concatenate.foreach(line => println("concatenate"+line))
+//
+//    //Se hace el mapeo a ((banda, bucket), documento)
+//    val mapBucket = concatenate.map(x => (x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % getPrimeValue(nband), x._1.split(",")(1)))
+//    if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
 
     //Se concatenan los documentos que pertenezcan a la misma banda y misma cubeta
-    val reduceBucket = mapBucket.reduceByKey((a,b) => a + "," +b)
+    val reduceBucket = mapBucket.reduceByKey((a,b) => a + ";" +b)
     if (isDebug) reduceBucket.foreach(line => println("reduceBucket: " + line))
 
     //Se dejan solo los resultados que contengan por lo menos un par de documentos
-    val reduceFilter = reduceBucket.filter(line => line._2.split(",").size > 1)
+    val reduceFilter = reduceBucket.filter(line => line._2.split(";").size > 1)
     if (isDebug) reduceFilter.foreach(line => println("reduceFilter: " + line))
 
 
