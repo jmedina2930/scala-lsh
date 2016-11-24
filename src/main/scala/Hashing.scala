@@ -92,12 +92,12 @@ object Hashing {
 
   def classHashFunction (bandAndDocument: RDD[Tuple2[String, String]], isDebug: Boolean, nband: Int) : RDD[Tuple2[String,String]] = {
     //Concatena todas las firmas que pertenezcan a una misma banda y documento
-    val longSignatures = bandAndDocument.map(line => (line._1, line._2.toLong))
-    val sumSignatures = longSignatures.reduceByKey((a,b) => a+b)
+//    val longSignatures = bandAndDocument.map(line => (line._1, line._2.toLong))
+    val sumSignatures = bandAndDocument.reduceByKey((a,b) => a+b)
     if (isDebug) sumSignatures.foreach(line => println("concatenate"+line))
 
     //Se hace el mapeo a ((banda, bucket), documento)
-    val mapBucket = sumSignatures.map(x => (x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % getPrimeValue(nband), x._1.split(",")(1)))
+    val mapBucket = sumSignatures.map(x => (x._1.split(",")(0) + "," + ((BigInt(x._2) + x._1.split(",")(0).toLong) % getPrimeValue(nband)), x._1.split(",")(1)))
     if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
     mapBucket
   }
