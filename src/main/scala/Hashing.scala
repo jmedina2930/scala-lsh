@@ -11,11 +11,11 @@ object Hashing {
     arr.map(_ => List[String]())
   }
 
-  def stupidHash(word: String, seed: Int = 0): Int = {
+  def stupidHash(word: String, seed: BigInt = 0): BigInt = {
     word.getBytes.foldLeft(0)(_+_)
   }
 
-  def javaHash(word: String, seed: Int = 0): Int = {
+  def javaHash(word: String, seed: BigInt = 0): BigInt = {
     var hash = 0
 
     for (ch <- word.toCharArray)
@@ -56,7 +56,7 @@ object Hashing {
     hash
   }
 
-  def knuthHash(word: String, constant: Int): Int = {
+  def knuthHash(word: String, constant: BigInt): BigInt = {
     var hash = 0
     for (ch <- word.toCharArray)
       hash = ((hash << 5) ^ (hash >> 27)) ^ ch.toInt
@@ -67,7 +67,7 @@ object Hashing {
     * encuentra el númuero primo mayor que n más cercano
     *
     */
-  def getPrimeValue(base: Long): Long = {
+  def getPrimeValue(base: Int): Int = {
 
     var primoMayor = base
     var flag = true
@@ -90,37 +90,46 @@ object Hashing {
     primoMayor
   }
 
-  def classHashFunction (bandAndDocument: RDD[Tuple2[String, String]], isDebug: Boolean, nband: Int, rowPerBand: Int) : RDD[Tuple2[String,String]] = {
-    //Concatena todas las firmas que pertenezcan a una misma banda y documento
-//    val longSignatures = bandAndDocument.map(line => (line._1, line._2.toLong))
-    val sumSignatures = bandAndDocument.reduceByKey((a,b) => a+b)
-    if (isDebug) sumSignatures.foreach(line => println("sumSignatures"+line))
+//  def classHashFunction (bandAndDocument: RDD[Tuple2[String, String]], isDebug: Boolean, nband: Int, rowPerBand: Int) : RDD[Tuple2[String,String]] = {
+//    //Concatena todas las firmas que pertenezcan a una misma banda y documento
+////    val longSignatures = bandAndDocument.map(line => (line._1, line._2.toLong))
+//    val sumSignatures = bandAndDocument.reduceByKey((a,b) => a+b)
+//    if (isDebug) sumSignatures.foreach(line => println("sumSignatures"+line))
+//
+//    val primeValue = getPrimeValue(nband*rowPerBand)
+//    if (isDebug)  println("primeValue = "+primeValue)
+//    //Se hace el mapeo a ((banda, bucket), documento)
+//    //val mapBucket = sumSignatures.map(x => (x._1.split(",")(0) + "," + ((BigInt(x._2) + x._1.split(",")(0).toLong) % primeValue ), x._1.split(",")(1)))
+//    val mapBucket = sumSignatures.map(x => (x._1.split(",")(0) + "," + ((BigInt(x._2) + BigInt(nband)) % BigInt(primeValue) ), x._1.split(",")(1)))
+//    if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
+//    mapBucket
+//  }
 
-    val primeValue = getPrimeValue(nband*rowPerBand)
-    if (isDebug)  println("primeValue = "+primeValue)
-    //Se hace el mapeo a ((banda, bucket), documento)
-    //val mapBucket = sumSignatures.map(x => (x._1.split(",")(0) + "," + ((BigInt(x._2) + x._1.split(",")(0).toLong) % primeValue ), x._1.split(",")(1)))
-    val mapBucket = sumSignatures.map(x => (x._1.split(",")(0) + "," + ((BigInt(x._2) + BigInt(nband)) % BigInt(primeValue) ), x._1.split(",")(1)))
-    if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
-    mapBucket
-  }
-
-  def main(words: List[String]): Unit = {
-    val buckets = initBuckets(BUCKETSIZE)
-//    val diff = words.length/BUCKETSIZE
+  def randomHashFunction (bandAndDocument: RDD[Tuple2[String, String]], isDebug: Boolean, nband: Int, rowPerBand: Int) : RDD[Tuple2[String,String]] = {
 
     import scala.util.Random
+
+    val primeValue = getPrimeValue(nband*rowPerBand)
     val seed = Random.nextInt
-    for (word <- words) {
-      // val bucket = stupidHash(word, seed) % BUCKETSIZE
-      // val bucket = javaHash(word, seed) & (BUCKETSIZE-1)
-      // val bucket = murmurHash(word, seed) % BUCKETSIZE
-      // val bucket = knuthHash(word, 1009) & (BUCKETSIZE-1)
-      val bucket = knuthHash(word, 31) & (BUCKETSIZE-1)
+    val chosenFunction = Random.nextInt(5)
+    println("aleatorio: " + chosenFunction)
+    chosenFunction match {
+      case 0 => {
+        val sumSignatures = bandAndDocument.reduceByKey((a,b) => a+b)
+        if (isDebug) sumSignatures.foreach(line => println("sumSignatures"+line))
+        val mapBucket = sumSignatures.map(x => (x._1.split(",")(0) + "," + ((BigInt(x._2) + BigInt(nband)) % BigInt(primeValue) ), x._1.split(",")(1)))
+        mapBucket}
+      case 1 => {
+        val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (knuthHash(x._2, BigInt(primeValue)) & BigInt(primeValue) ), x._1.split(",")(1)))
+        mapBucket}
+      case 2 => {val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (stupidHash(x._2, BigInt(primeValue)) % BigInt(primeValue) ), x._1.split(",")(1)))
+        mapBucket}
+      case 3 => {val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (javaHash(x._2, BigInt(primeValue)) & BigInt(primeValue) ), x._1.split(",")(1)))
+        mapBucket}
+      case 4 => {val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (murmurHash(x._2, primeValue) % primeValue ), x._1.split(",")(1)))
+        mapBucket}
 
-      buckets(bucket) ::= word
     }
-
-    println(buckets.map(x => (x.length :: x.take(3)).mkString("\t")).mkString("\n"))
   }
+
 }

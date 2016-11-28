@@ -85,6 +85,11 @@ object LshMain {
     val directoryOutput : String = args(1)
     val nband : Int = args(2).toInt
     val rowsPerBand : Int = args(3).toInt
+
+//    val signaturesFilePath = "data/test1/step2"
+//    val directoryOutput = "data/out"
+//    val nband = 20
+//    val rowsPerBand = 5
     
     println("signaturesFilePath: "+signaturesFilePath)
     println("directoryOutput   : "+directoryOutput)
@@ -107,15 +112,8 @@ object LshMain {
     if (isDebug) bandAndDocument.foreach(line => println("bandAndDocument"+line))
 
     //se aplica una funcion hash
-    val mapBucket = Hashing.classHashFunction(bandAndDocument, isDebug(), nband, rowsPerBand)
-
-//    //Concatena todas las firmas que pertenezcan a una misma banda y documento
-//    val concatenate = bandAndDocument.reduceByKey((a,b) => a+b)
-//    if (isDebug) concatenate.foreach(line => println("concatenate"+line))
-//
-//    //Se hace el mapeo a ((banda, bucket), documento)
-//    val mapBucket = concatenate.map(x => (x._1.split(",")(0) + "," + (BigInt.apply(x._2) + BigInt.apply(x._1.split(",")(0))) % getPrimeValue(nband), x._1.split(",")(1)))
-//    if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
+    val mapBucket = Hashing.randomHashFunction(bandAndDocument, isDebug(), nband, rowsPerBand)
+    if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
 
     //Se concatenan los documentos que pertenezcan a la misma banda y misma cubeta
     val reduceBucket = mapBucket.reduceByKey((a,b) => a + ";" +b)
@@ -124,7 +122,6 @@ object LshMain {
     //Se dejan solo los resultados que contengan por lo menos un par de documentos
     val reduceFilter = reduceBucket.filter(line => line._2.split(";").size > 1)
     if (isDebug) reduceFilter.foreach(line => println("reduceFilter: " + line))
-
 
     //Segunda fase Map-Reduce------------------------------------------------
 
