@@ -12,7 +12,7 @@ object LshMain {
     * En este modo se deja codigo adicional que puede afectar el rendimiento. Ejemplo: guardar archivos
     */
   def isDebug(): Boolean = {
-    false
+    true
   }
 
   /**
@@ -107,7 +107,7 @@ object LshMain {
     if (isDebug) bandAndDocument.foreach(line => println("bandAndDocument"+line))
 
     //se aplica una funcion hash
-    val mapBucket = Hashing.classHashFunction(bandAndDocument, isDebug(), nband)
+    val mapBucket = Hashing.classHashFunction(bandAndDocument, isDebug(), nband, rowsPerBand)
 
 //    //Concatena todas las firmas que pertenezcan a una misma banda y documento
 //    val concatenate = bandAndDocument.reduceByKey((a,b) => a+b)
