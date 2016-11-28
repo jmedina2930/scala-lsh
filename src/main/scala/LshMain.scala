@@ -12,7 +12,7 @@ object LshMain {
     * En este modo se deja codigo adicional que puede afectar el rendimiento. Ejemplo: guardar archivos
     */
   def isDebug(): Boolean = {
-    true
+    false
   }
 
   /**
@@ -24,39 +24,6 @@ object LshMain {
     println("[" + time + "]:" + message)
   }
 
-  /**
-    * Crea archivo con datos de prueba
-    * (h0,D0,0), (h0,D1,0), ...
-    */
-  def createDataFile(sc: SparkContext, directoryOutput: String): Unit = {
-    val array = new Array[(String, String)](200)
-    //key = hash,group,signature, h0, D1, 2
-    for (i <- 0 until 20) {
-      for (j <- 0 until 10) {
-        array(i * 10 + j) = ("(" + (i + 1).toString() + "," + (j + 1).toString() + ")" -> (i % 5).toString())
-      }
-    }
-
-    val arrayRdd = sc.parallelize(array)
-    arrayRdd.saveAsTextFile(directoryOutput)
-  }
-
-  /**
-    * Borra directorio de salida
-    * hdfs = true => borra el directorio en el sistema distribuido, false en el sistema local
-    */
-  def deleteDirectoryOutput(directoryOutput: String, hdfs: Boolean): Unit = {
-
-    if (!hdfs) {
-      val file = new File(directoryOutput)
-      if (file.listFiles() != null) file.listFiles().foreach { x => x.delete() }
-      file.delete()
-    } else {
-      val hadoopConf = new org.apache.hadoop.conf.Configuration()
-      val hdfs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI("hdfs://localhost:8020"), hadoopConf)
-      hdfs.delete(new org.apache.hadoop.fs.Path(directoryOutput), true)
-    }
-  }
 
   /**
     * Mapea "id-shingle,id-doc,signature" to "band, id-doc", "id-shingle,id-doc,signature" Entera de Numero de linea/(Lineas por Banda)
@@ -114,38 +81,19 @@ object LshMain {
     /* *********************************************************************************************/
     //CONFIGIRACION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-//        Parametros de entrada (produccion cluster)
-//          val signaturesFilePath : String = args(0)
-//          val directoryOutput : String = args(1)
-//          val nband : Int = args(2).toInt
-//          val rowsPerBand : Int = args(3).toInt
-
-    //      Parametros quemados (Pruebas locales)
+    val signaturesFilePath : String = args(0)
+    val directoryOutput : String = args(1)
+    val nband : Int = args(2).toInt
+    val rowsPerBand : Int = args(3).toInt
     
-    val hdfsFiles = false
-//
-    val signaturesFilePath = "data/test1/step2"
-    val directoryOutput = "data/out"
-    val nband = 20
-    val rowsPerBand = 5
-    
-//    val hdfsFiles = true
-//    val signaturesFilePath = "/user/root/grupo2/results/test1/step2"
-//    val directoryOutput = "/user/grupo1/lsh/out1"
-//    //Numero de shingles 8007165
-//
-//    val nband = 2669055
-//    val rowsPerBand = 3
+    println("signaturesFilePath: "+signaturesFilePath)
+    println("directoryOutput   : "+directoryOutput)
+    println("nband             : "+nband)
+    println("rowsPerBand       : "+rowsPerBand)
 
     /* *********************************************************************************************/
 
-    deleteDirectoryOutput(directoryOutput, hdfsFiles)
-
-    //     createDataFile(sc, directoryOutput)
-
-
     printlnWithTime("Inicia")
-
 
     //lee archivo con tres valores: Id shingle(Long), Id documento (Long), Signature
     val file = sc.textFile(signaturesFilePath)
@@ -153,19 +101,20 @@ object LshMain {
 
     //Primera fase Map-Reduce----------------------------------------------------
 
+
     // Mapea banda Y documento "(1,1,0)", "(1,2,0)" map to: ("1,1", "0"),("1,2", "0")
     val bandAndDocument = file.map(line => getBandAndDocument(line, rowsPerBand))
     if (isDebug) bandAndDocument.foreach(line => println("bandAndDocument"+line))
 
     //se aplica una funcion hash
-    val mapBucket = Hashing.classHashFunction(bandAndDocument, isDebug(),nband)
+    val mapBucket = Hashing.classHashFunction(bandAndDocument, isDebug(), nband)
 
-    //Concatena todas las firmas que pertenezcan a una misma banda y documento
+//    //Concatena todas las firmas que pertenezcan a una misma banda y documento
 //    val concatenate = bandAndDocument.reduceByKey((a,b) => a+b)
 //    if (isDebug) concatenate.foreach(line => println("concatenate"+line))
 //
 //    //Se hace el mapeo a ((banda, bucket), documento)
-//    val mapBucket = concatenate.map(x => (x._1.split(",")(0) + "," + (x._2.toLong + x._1.split(",")(0).toLong) % getPrimeValue(nband), x._1.split(",")(1)))
+//    val mapBucket = concatenate.map(x => (x._1.split(",")(0) + "," + (BigInt.apply(x._2) + BigInt.apply(x._1.split(",")(0))) % getPrimeValue(nband), x._1.split(",")(1)))
 //    if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
 
     //Se concatenan los documentos que pertenezcan a la misma banda y misma cubeta
@@ -187,7 +136,7 @@ object LshMain {
     val reduce2 = map2.reduceByKey((a,b) => a+b)
     if (isDebug()) reduce2.foreach(line => println("Reduce2: " + line))
     
-    reduce2.saveAsTextFile(directoryOutput)
+    reduce2.repartition(1).saveAsTextFile(directoryOutput)
 
     printlnWithTime("Fin")
 
