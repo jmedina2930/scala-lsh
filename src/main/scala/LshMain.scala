@@ -73,6 +73,13 @@ object LshMain {
     }
     primoMayor
   }  
+  
+  def orderId(list : (String, Int)) : (String, Int)={
+    
+    val array = list._1.split(";").map(x => x.toLong)
+    val orderedArray = array.sortWith(_ < _)
+    (orderedArray.mkString(";"), list._2)
+  }
 
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf().setAppName("Scala-LSH").setMaster("local")
@@ -112,7 +119,7 @@ object LshMain {
     if (isDebug) bandAndDocument.foreach(line => println("bandAndDocument"+line))
 
     //se aplica una funcion hash
-    val mapBucket = Hashing.randomHashFunction(bandAndDocument, isDebug(), nband, rowsPerBand)
+    val mapBucket = Hashing.hashFunction(bandAndDocument, isDebug(), nband, rowsPerBand, 0)
     if (isDebug) mapBucket.foreach(line => println("mapBucket: " + line))
 
     //Se concatenan los documentos que pertenezcan a la misma banda y misma cubeta
@@ -126,8 +133,9 @@ object LshMain {
     //Segunda fase Map-Reduce------------------------------------------------
 
     //Mapeo a: ((doc1, doc2, ...), 1)
-    val map2 = reduceFilter.map(x => (x._2,1))
+    val map2 = reduceFilter.map(x => (x._2,1)).map(x => orderId(x))
     if (isDebug()) map2.foreach(line => println("Map2: " + line))
+    
 
     //Reduce para sumar los pares candidatos repetidos
     val reduce2 = map2.reduceByKey((a,b) => a+b)

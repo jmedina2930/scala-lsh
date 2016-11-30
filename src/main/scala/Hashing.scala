@@ -11,11 +11,11 @@ object Hashing {
     arr.map(_ => List[String]())
   }
 
-  def stupidHash(word: String, seed: BigInt = 0): BigInt = {
+  def stupidHash(word: String, seed: Int = 0): Int = {
     word.getBytes.foldLeft(0)(_+_)
   }
 
-  def javaHash(word: String, seed: BigInt = 0): BigInt = {
+  def javaHash(word: String, seed: Int = 0): Int = {
     var hash = 0
 
     for (ch <- word.toCharArray)
@@ -33,7 +33,7 @@ object Hashing {
     val m = 5
     val n = 0xe6546b64
 
-    var hash = seed
+    var hash  = seed
 
     for (ch <- word.toCharArray) {
       var k = ch.toInt
@@ -56,7 +56,7 @@ object Hashing {
     hash
   }
 
-  def knuthHash(word: String, constant: BigInt): BigInt = {
+  def knuthHash(word: String, constant: Int): Int = {
     var hash = 0
     for (ch <- word.toCharArray)
       hash = ((hash << 5) ^ (hash >> 27)) ^ ch.toInt
@@ -105,13 +105,15 @@ object Hashing {
 //    mapBucket
 //  }
 
-  def randomHashFunction (bandAndDocument: RDD[Tuple2[String, String]], isDebug: Boolean, nband: Int, rowPerBand: Int) : RDD[Tuple2[String,String]] = {
+  def hashFunction (bandAndDocument: RDD[Tuple2[String, String]], isDebug: Boolean, nband: Int, rowPerBand: Int, hashId: Int) : RDD[Tuple2[String,String]] = {
 
     import scala.util.Random
 
     val primeValue = getPrimeValue(nband*rowPerBand)
     val seed = Random.nextInt
-    val chosenFunction = Random.nextInt(5)
+    var chosenFunction = hashId
+    if(hashId < 0) chosenFunction = Random.nextInt(5)
+    
     println("aleatorio: " + chosenFunction)
     chosenFunction match {
       case 0 => {
@@ -120,13 +122,13 @@ object Hashing {
         val mapBucket = sumSignatures.map(x => (x._1.split(",")(0) + "," + ((BigInt(x._2) + BigInt(nband)) % BigInt(primeValue) ), x._1.split(",")(1)))
         mapBucket}
       case 1 => {
-        val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (knuthHash(x._2, BigInt(primeValue)) & BigInt(primeValue) ), x._1.split(",")(1)))
+        val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (knuthHash(x._2, primeValue) & primeValue ), x._1.split(",")(1)))
         mapBucket}
-      case 2 => {val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (stupidHash(x._2, BigInt(primeValue)) % BigInt(primeValue) ), x._1.split(",")(1)))
+      case 2 => {val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (stupidHash(x._2, primeValue) % primeValue ), x._1.split(",")(1)))
         mapBucket}
-      case 3 => {val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (javaHash(x._2, BigInt(primeValue)) & BigInt(primeValue) ), x._1.split(",")(1)))
-        mapBucket}
-      case 4 => {val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (murmurHash(x._2, primeValue) % primeValue ), x._1.split(",")(1)))
+      case 3 => {val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (murmurHash(x._2, primeValue) % primeValue ), x._1.split(",")(1)))
+        mapBucket}      
+      case 4 => {val mapBucket = bandAndDocument.map(x => (x._1.split(",")(0) + "," + (javaHash(x._2, primeValue) & primeValue ), x._1.split(",")(1)))
         mapBucket}
 
     }
